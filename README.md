@@ -7,7 +7,7 @@ Welcome to the **AfterQuery AI Interviewer** technical assessment. This platform
 ## 🛠️ Assignment Overview
 - **Objective**: Build a voice-driven AI Interviewer platform for domain experts.
 - **Repository**: Developed as part of the AfterQuery Infrastructure Team evaluation via Candidate Code.
-- **Deployment**: [Insert your Vercel URL here]
+- **Deployment**: [https://aq-latam-take-home-zeta.vercel.app/](https://aq-latam-take-home-zeta.vercel.app/)
 
 ---
 

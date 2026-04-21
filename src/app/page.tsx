@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { SAMPLE_JOBS, Job, Message, Evaluation } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { SAMPLE_JOBS, Job, Message, Evaluation, HistorySession } from '@/lib/types';
 import { useInterviewStore } from '@/lib/store';
 import { JobCard } from '@/components/JobCard';
 import { InterviewRoom } from '@/components/InterviewRoom';
 import { EvaluationView } from '@/components/EvaluationView';
-import { Zap, ShieldCheck, Cpu } from 'lucide-react';
+import { HistoryView } from '@/components/HistoryView';
+import { Zap, ShieldCheck, Cpu, History as HistoryIcon } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -14,20 +15,47 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type AppState = 'selecting' | 'interviewing' | 'evaluating';
+type AppState = 'selecting' | 'interviewing' | 'evaluating' | 'history' | 'replaying';
 
 export default function Home() {
   const [state, setState] = useState<AppState>('selecting');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [transcript, setTranscript] = useState<Message[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [history, setHistory] = useState<HistorySession[]>([]);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('afterquery_history');
+    if (saved) {
+      setHistory(JSON.parse(saved));
+    }
+  }, []);
 
   const handleSelectJob = (job: Job) => {
+    useInterviewStore.getState().reset();
     setSelectedJob(job);
     setState('interviewing');
   };
 
   const handleFinishInterview = (finalTranscript: Message[], finalEvaluation: Evaluation) => {
+    // Save to History (Stretch Goal #4)
+    const newSession: HistorySession = {
+      id: Math.random().toString(36).substring(7),
+      jobTitle: selectedJob?.title || 'Unknown Role',
+      timestamp: new Date().toISOString(),
+      duration: '4:20', // Mock duration
+      talkRatio: 65,    // Mock metrics
+      topicCoverage: 88,
+      overallScore: finalEvaluation.overallScore,
+      transcript: finalTranscript,
+      evaluation: finalEvaluation,
+    };
+
+    const updatedHistory = [newSession, ...history];
+    setHistory(updatedHistory);
+    localStorage.setItem('afterquery_history', JSON.stringify(updatedHistory));
+
     setTranscript(finalTranscript);
     setEvaluation(finalEvaluation);
     setState('evaluating');
@@ -39,6 +67,14 @@ export default function Home() {
     setSelectedJob(null);
     setTranscript([]);
     setEvaluation(null);
+  };
+
+  const handleOpenHistory = () => setState('history');
+  
+  const handleReplay = (session: HistorySession) => {
+    setTranscript(session.transcript);
+    setEvaluation(session.evaluation);
+    setState('evaluating');
   };
 
   return (
@@ -58,8 +94,14 @@ export default function Home() {
           </div>
           
           <div className="hidden lg:flex items-center gap-12 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+            <button 
+              onClick={handleOpenHistory}
+              className="flex items-center gap-2 hover:text-black transition-colors"
+            >
+              <HistoryIcon size={14} />
+              Archives
+            </button>
             <span className="hover:text-black transition-colors cursor-default">Verified</span>
-            <span className="hover:text-black transition-colors cursor-default">Low Latency</span>
             <span className="hover:text-black transition-colors cursor-default">Agentic</span>
           </div>
         </div>
@@ -68,14 +110,23 @@ export default function Home() {
       <div className="py-20 px-8 max-w-7xl mx-auto">
         {state === 'selecting' && (
           <div className="space-y-20 animate-slide-up">
-            <div className="max-w-4xl space-y-8">
-              <h1 className="text-7xl md:text-8xl font-black text-black tracking-tight-heading leading-[0.85] uppercase">
-                The AI <br/> Benchmark.
-              </h1>
-              <div className="h-1 w-24 bg-black" />
-              <p className="text-[#6B6B6B] text-xl md:text-2xl font-medium leading-relaxed max-w-2xl text-balance">
-                Bridging the gap between generalist AI and professional automation through reasoning traces.
-              </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+              <div className="max-w-4xl space-y-8">
+                <h1 className="text-7xl md:text-8xl font-black text-black tracking-tight-heading leading-[0.85] uppercase">
+                  The AI <br/> Benchmark.
+                </h1>
+                <div className="h-1 w-24 bg-black" />
+                <p className="text-[#6B6B6B] text-xl md:text-2xl font-medium leading-relaxed max-w-2xl text-balance">
+                  Bridging the gap between generalist AI and professional automation through reasoning traces.
+                </p>
+              </div>
+              <button 
+                onClick={handleOpenHistory}
+                className="group flex flex-col items-end gap-2 border-r-2 border-black pr-6 py-2 hover:translate-x-2 transition-all"
+              >
+                <span className="text-black font-black text-2xl">0{history.length}</span>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Stored Archives</span>
+              </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -111,6 +162,14 @@ export default function Home() {
             transcript={transcript} 
             evaluation={evaluation} 
             onRestart={handleRestart} 
+          />
+        )}
+
+        {state === 'history' && (
+          <HistoryView 
+            sessions={history} 
+            onBack={handleRestart} 
+            onReplay={handleReplay} 
           />
         )}
       </div>

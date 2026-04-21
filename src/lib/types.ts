@@ -64,6 +64,21 @@ export const EvaluationRequestSchema = z.object({
 
 export type EvaluationReq = z.infer<typeof EvaluationRequestSchema>;
 
+// 7. History & Analytics (Stretch Goal #4)
+export const HistorySessionSchema = z.object({
+  id: z.string(),
+  jobTitle: z.string(),
+  timestamp: z.string(),
+  duration: z.string(),
+  talkRatio: z.number(), // % of words by candidate
+  topicCoverage: z.number(),
+  overallScore: z.number(),
+  transcript: z.array(MessageSchema),
+  evaluation: EvaluationSchema,
+});
+
+export type HistorySession = z.infer<typeof HistorySessionSchema>;
+
 // 6. Question Packs (Stretch Goal #2)
 export const JOB_QUESTION_PACKS: Record<string, { behavioral: string[], technical: string[] }> = {
   'swe-backend': {
