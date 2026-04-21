@@ -17,28 +17,45 @@ export async function POST(req: Request) {
     const { history, jobTitle, jobDescription } = validation.data;
 
     // 2. Identify Question Pack (Stretch Goal #2)
-    // Find job id by searching titles
-    const jobKey = jobTitle.toLowerCase().includes('backend') ? 'swe-backend' : 
-                   jobTitle.toLowerCase().includes('product') ? 'product-manager' : 
+    const titleLower = jobTitle.toLowerCase();
+    const jobKey = titleLower.includes('backend') ? 'swe-backend' : 
+                   titleLower.includes('product') ? 'product-manager' : 
                    'financial-analyst';
     
     const pack = JOB_QUESTION_PACKS[jobKey];
     const packString = `Behavioral: ${pack.behavioral.join(' | ')} \nTechnical: ${pack.technical.join(' | ')}`;
 
-    // 3. Telemetry & Execution Layer
+    // 3. Execution Layer with Defensive Parsing
     const content = await Telemetry.measure('ai_interview_completion', async () => {
-      return await openRouterService.generateCompletion({
+      const response = await openRouterService.generateCompletion({
         systemPrompt: PromptFactory.getInterviewerPrompt(jobTitle, jobDescription, packString),
         history
       });
+      return response;
     }, { jobTitle });
     
-    if (!content) {
-      throw new Error("No response from AI model");
-    }
+    if (!content) throw new Error("AI core returned empty signal");
 
-    const result = JSON.parse(content);
-    return NextResponse.json(result);
+    try {
+      // 1. Clean markdown wrappers
+      const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+      let result = JSON.parse(cleanContent);
+      
+      // 2. Recovery Layer (If model forgot the 'question' key but left it in intent or elsewhere)
+      if (!result.question) {
+        console.warn("AI Omitted 'question' key. Attempting recovery...");
+        result.question = result.reasoningTrace?.intent || "Can you elaborate more on your previous technical experience?";
+      }
+
+      // 3. Ensure arrays exist for UI safety
+      if (!result.reasoningTrace) result.reasoningTrace = {};
+      if (!result.reasoningTrace.skills_detected) result.reasoningTrace.skills_detected = [];
+
+      return NextResponse.json(result);
+    } catch (parseError) {
+      console.error("JSON Parse Error. Raw Content:", content);
+      throw new Error("AI response format was invalid. Signal corrupted.");
+    }
   } catch (error: any) {
     console.error({
       step: 'api_interview',

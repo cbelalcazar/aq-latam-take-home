@@ -34,17 +34,29 @@ export const useInterviewStore = create<InterviewStore>((set) => ({
   capturedText: "",
   error: null,
 
-  setState: (state) => set({ state }),
+  setState: (state) => {
+    console.log(`[FSM Transition] -> ${state}`);
+    set({ state });
+  },
   setCapturedText: (capturedText) => set({ capturedText }),
-  setError: (error) => set({ error }),
+  setError: (error) => {
+    if (error) console.error(`[System Error] ${error}`);
+    set({ error });
+  },
   setReasoning: (currentReasoning) => set({ currentReasoning }),
-  addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
+  addMessage: (message) => {
+    console.log(`[Message Log] ${message.role.toUpperCase()}: ${message.content.substring(0, 30)}...`);
+    set((s) => ({ messages: [...s.messages, message] }));
+  },
   
-  reset: () => set({
-    state: 'IDLE',
-    messages: [],
-    currentReasoning: null,
-    capturedText: "",
-    error: null,
-  }),
+  reset: () => {
+    console.log(`[Store Reset] Clearing all data`);
+    set({
+      state: 'IDLE',
+      messages: [],
+      currentReasoning: null,
+      capturedText: "",
+      error: null,
+    });
+  },
 }));

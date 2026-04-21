@@ -15,17 +15,18 @@ STRICT OPERATIONAL RULES:
 6. For questions 5 and 6, you MUST generate targeted follow-ups that depend directly on the candidate's previous answers.
 7. The 6th question MUST be: "We have reached the end of this technical benchmark. Do you have any final remarks for the AfterQuery team before we conclude?"
 
-OUTPUT FORMAT:
-You MUST respond with a JSON object ONLY.
+OUTPUT FORMAT (STRICT JSON ONLY):
 {
   "reasoningTrace": {
-    "skills_detected": string[],
-    "topics_covered": string[],
-    "current_gap": string,
-    "intent": string
+    "skills_detected": ["skill1", "skill2"],
+    "topics_covered": ["topic1"],
+    "current_gap": "description of gap",
+    "intent": "goal of next question"
   },
-  "question": string
+  "question": "The actual question for the candidate"
 }
+
+STRICT RULE: Do not include any other keys.
 `;
 
 export const EVALUATION_TEMPLATE = `

@@ -4,7 +4,7 @@ import { Job, Message, Evaluation } from '@/lib/types';
 
 export function useAIEngine(job: Job, onFinish: (transcript: Message[], evaluation: Evaluation) => void) {
   const { 
-    state, messages, setState, setError, setReasoning, addMessage 
+    messages, setState, setError, setReasoning, addMessage 
   } = useInterviewStore();
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -18,12 +18,32 @@ export function useAIEngine(job: Job, onFinish: (transcript: Message[], evaluati
   }, []);
 
   const speak = (text: string) => {
+    if (!text) {
+      setState('IDLE');
+      return;
+    }
+    
     if (synthRef.current) {
       synthRef.current.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.95;
-      utterance.onend = () => setState('IDLE');
-      setTimeout(() => synthRef.current?.speak(utterance), 500);
+      
+      const finalize = () => {
+        if (useInterviewStore.getState().state === 'AI_SPEAKING') {
+          setState('IDLE');
+        }
+      };
+
+      utterance.onend = finalize;
+      utterance.onerror = finalize;
+      
+      // Safety net: Force IDLE state after text length * factor (roughly)
+      const estimatedDuration = (text.length * 100) + 2000;
+      setTimeout(finalize, estimatedDuration);
+
+      setTimeout(() => {
+        synthRef.current?.speak(utterance);
+      }, 500);
     } else {
       setState('IDLE');
     }
@@ -44,7 +64,17 @@ export function useAIEngine(job: Job, onFinish: (transcript: Message[], evaluati
         body: JSON.stringify({ history, jobTitle: job.title, jobDescription: job.description }),
       });
       
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Signal lost with AI core');
+      }
+
       const data = await res.json();
+      
+      if (!data.question) {
+        throw new Error('Incomplete data received from AI');
+      }
+
       const aiMessage: Message = {
         role: 'interviewer',
         content: data.question,
@@ -57,6 +87,7 @@ export function useAIEngine(job: Job, onFinish: (transcript: Message[], evaluati
       setState('AI_SPEAKING');
       speak(data.question);
     } catch (err: any) {
+      console.error("AI Engine Error:", err);
       setError(err.message);
       setState('IDLE');
     } finally {
@@ -71,12 +102,16 @@ export function useAIEngine(job: Job, onFinish: (transcript: Message[], evaluati
 
   const finishInterview = async () => {
     setState('EVALUATING');
+    setError(null);
     try {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: messages, jobTitle: job.title }),
       });
+
+      if (!res.ok) throw new Error('Evaluation signal failed');
+
       const evaluation = await res.json();
       onFinish(messages, evaluation);
       setState('COMPLETED');
